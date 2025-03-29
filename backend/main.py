@@ -34,22 +34,34 @@ app.add_middleware(
 
 import logging
 from logging.handlers import RotatingFileHandler
+import os
 
-# Set up a dedicated file logger
-# Set up a dedicated file logger
-file_handler = RotatingFileHandler('main.log', maxBytes=10485760, backupCount=5)
-file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+# Ensure the log directory exists
+LOG_FILE = os.path.join(os.path.dirname(__file__), "main.log")
+
+# Set up rotating log handler (10MB, keep 5 backups)
+file_handler = RotatingFileHandler(
+    LOG_FILE, maxBytes=10 * 1024 * 1024, backupCount=5
+)
+file_handler.setFormatter(logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+))
 file_handler.setLevel(logging.DEBUG)
 
-# Apply handler to root logger
+# Configure root logger
 root_logger = logging.getLogger()
 root_logger.setLevel(logging.DEBUG)
 root_logger.addHandler(file_handler)
 
-# ✅ Also define a separate app logger
+# Define and configure custom app logger
 app_logger = logging.getLogger("autospa")
 app_logger.setLevel(logging.DEBUG)
 app_logger.addHandler(file_handler)
+
+# Optional: redirect print() to log file
+import sys
+sys.stdout = open(LOG_FILE, 'a')
+sys.stderr = open(LOG_FILE, 'a')
 
 # Database configuration
 DATABASE_URL = "sqlite:///./autospa.db"
