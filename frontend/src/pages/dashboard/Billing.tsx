@@ -282,7 +282,6 @@ const Billing = () => {
     try {
       if (!generatedBill) {
         toast.error('No bill to submit');
-        setIsPrintDialogOpen(false);
         return;
       }
       
@@ -357,7 +356,7 @@ const Billing = () => {
         
         .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; }
         .footer p { margin: 4px 0; font-size: 12px; color: #4a4a4a; }
-
+  
         .footer1 { text-align: center; margin-top: 10px; padding-top: 20px; border-top: 1px solid #dee2e6; }
         .footer1 p { margin: 4px 0; font-size: 9px; color: #4a4a4a; }
         
@@ -368,122 +367,128 @@ const Billing = () => {
         }
       `;
       
-      // Create the print-specific HTML content
-      document.body.innerHTML = `
-        <style>${printStyles}</style>
-        <div class="print-content">
-          <div class="print-header">
-            <img src="/lovable-uploads/9e4813d3-fe57-41e4-a643-bee06a651855.png" alt="AutoSpa Logo" class="logo" />
-            <div class="company-name">AutoSpa Pvt Ltd</div>
-            <div class="company-subtitle">Vehicle Spare Parts & Service Center</div>
+       document.body.innerHTML = `
+      <style>${printStyles}</style>
+      <div class="print-content">
+        <div class="print-header">
+          <img src="/lovable-uploads/9e4813d3-fe57-41e4-a643-bee06a651855.png" alt="AutoSpa Logo" class="logo" />
+          <div class="company-name">AutoSpa Pvt Ltd</div>
+          <div class="company-subtitle">Vehicle Spare Parts & Service Center</div>
+        </div>
+        
+        <div class="invoice-info">
+          <div class="bill-to">
+            <div style="margin-bottom: 5px;">Bill To:</div>
+            <div><strong>${generatedBill.customer.name || 'Customer'}</strong></div>
+            <div>${generatedBill.customer.mobile || '-'}</div>
+            <div>${generatedBill.customer.company || '-'}</div>
+            <div>Vehicle: <strong>${generatedBill.customer.vehicleNumber}</strong></div>
           </div>
           
-          <div class="invoice-info">
-            <div class="bill-to">
-              <div style="margin-bottom: 5px;">Bill To:</div>
-              <div><strong>${generatedBill.customer.name || 'Customer'}</strong></div>
-              <div>${generatedBill.customer.mobile || '-'}</div>
-              <div>${generatedBill.customer.company || '-'}</div>
-              <div>Vehicle: <strong>${generatedBill.customer.vehicleNumber}</strong></div>
-            </div>
-            
-            <div class="invoice-details">
-              <div style="margin-bottom: 5px;">Invoice Details:</div>
-              <div>Invoice #: INV-${generatedBill.id.substring(0, 8)}</div>
-              <div>Date: ${format(new Date(generatedBill.date), 'dd/MM/yyyy')}</div>
-              <div>Payment: ${
-                generatedBill.paymentMethod === 'cash' ? 'Cash' :
-                generatedBill.paymentMethod === 'card' ? 'Card' : 'UPI'
-              }</div>
-            </div>
-          </div>
-          
-          <table>
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th class="text-right">Price</th>
-                <th class="text-right">Qty</th>
-                <th class="text-right">Disc.</th>
-                <th class="text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${generatedBill.items.map(item => `
-                <tr>
-                  <td>
-                    <div>${item.name}</div>
-                    <div class="item-code">${item.code}</div>
-                  </td>
-                  <td class="text-right">Rs.${item.price.toLocaleString()}</td>
-                  <td class="text-right">${item.quantity}</td>
-                  <td class="text-right">${item.discount}%</td>
-                  <td class="text-right">Rs.${item.total.toLocaleString()}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-          
-          <div class="total-section">
-            <div>Subtotal: Rs.${generatedBill.subTotal.toLocaleString()}</div>
-            ${generatedBill.discount > 0 ? `
-              <div>Discount (${generatedBill.discount}%): -Rs.${((generatedBill.subTotal - generatedBill.total)).toLocaleString()}</div>
-            ` : ''}
-            <div><strong>Total: Rs.${generatedBill.total.toLocaleString()}</strong></div>
-          </div>
-          
-          ${generatedBill.notes ? `
-            <div style="margin-top: 15px;">
-              <div>Notes:</div>
-              <div>${generatedBill.notes}</div>
-            </div>
-          ` : ''}
-          
-          <div class="footer text-center text-xs text-muted-foreground pt-2 border-t">
-            <p class="mb-1">AutoSpa PVT LTD</p>
-            <p class="mb-1">Kandy Road, Molagoda, Kegalle<br/>(Next to Millangoda Filling Station)</p>
-            <p class="mb-1">Contact Us:<br/>0715197759 | 0761752556</p>
-            <p class="font-semibold mb-1">The pioneer of all kinds of vehicle repairing, maintenance, & car refreshening services</p>
-
-          </div>
-                  <div class="footer1 text-center text-xs text-muted-foreground pt-2 border-t">
-                              <p class=" mb-1">Powered by Konnetor Digital Solutions | konnetor.com | +94 74 177 0447 </p>
-                             
-                  </div>
+          <div class="invoice-details">
+            <div style="margin-bottom: 5px;">Invoice Details:</div>
+            <div>Invoice #: INV-${generatedBill.id.substring(0, 8)}</div>
+            <div>Date: ${format(new Date(generatedBill.date), 'dd/MM/yyyy')}</div>
+            <div>Payment: ${
+              generatedBill.paymentMethod === 'cash' ? 'Cash' :
+              generatedBill.paymentMethod === 'card' ? 'Card' : 'UPI'
+            }</div>
           </div>
         </div>
-      `;
-      
-      // Change the page title for printing
-      document.title = `AutoSpa Invoice - ${generatedBill.customer.vehicleNumber}`;
-      
-      // Print the document
-      window.print();
-      
-      // Restore the original content after printing
-      document.body.innerHTML = originalBody;
-      document.title = originalTitle;
-      
-      // Success message and UI cleanup
-      toast.success('Invoice sent to printer and saved successfully');
-      setIsPrintDialogOpen(false);
-      
-      // Reset form after successful submission and printing
-      setBillItems([]);
-      setVehicleNumber('');
-      setCustomerName('');
-      setMobileNumber('');
-      setCompanyName('');
-      setTotalDiscount('');
-      setPaymentMethod('cash');
-      setNotes('');
-      setGeneratedBill(null);
-    } catch (error) {
-      console.error('Error submitting bill:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to submit bill');
-      setIsPrintDialogOpen(false);
-    }
-  };
+        
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th class="text-right">Price</th>
+              <th class="text-right">Qty</th>
+              <th class="text-right">Disc.</th>
+              <th class="text-right">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${generatedBill.items.map(item => `
+              <tr>
+                <td>
+                  <div>${item.name}</div>
+                  <div class="item-code">${item.code}</div>
+                </td>
+                <td class="text-right">Rs.${item.price.toLocaleString()}</td>
+                <td class="text-right">${item.quantity}</td>
+                <td class="text-right">${item.discount}%</td>
+                <td class="text-right">Rs.${item.total.toLocaleString()}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        
+        <div class="total-section">
+          <div>Subtotal: Rs.${generatedBill.subTotal.toLocaleString()}</div>
+          ${generatedBill.discount > 0 ? `
+            <div>Discount (${generatedBill.discount}%): -Rs.${((generatedBill.subTotal - generatedBill.total)).toLocaleString()}</div>
+          ` : ''}
+          <div><strong>Total: Rs.${generatedBill.total.toLocaleString()}</strong></div>
+        </div>
+        
+        ${generatedBill.notes ? `
+          <div style="margin-top: 15px;">
+            <div>Notes:</div>
+            <div>${generatedBill.notes}</div>
+          </div>
+        ` : ''}
+        
+        <div class="footer text-center text-xs text-muted-foreground pt-2 border-t">
+          <p class="mb-1">AutoSpa PVT LTD</p>
+          <p class="mb-1">Kandy Road, Molagoda, Kegalle<br/>(Next to Millangoda Filling Station)</p>
+          <p class="mb-1">Contact Us:<br/>0715197759 | 0761752556</p>
+          <p class="font-semibold mb-1">The pioneer of all kinds of vehicle repairing, maintenance, & car refreshening services</p>
+
+        </div>
+                <div class="footer1 text-center text-xs text-muted-foreground pt-2 border-t">
+                            <p class=" mb-1">Powered by Konnetor Digital Solutions | konnetor.com | +94 74 177 0447 </p>
+                           
+                </div>
+        </div>
+      </div>
+    `;
+    
+    // Change the page title for printing
+    document.title = `AutoSpa Invoice - ${generatedBill.customer.vehicleNumber}`;
+    
+    // Print the document
+    window.print();
+    
+    // Restore the original content after printing
+    document.body.innerHTML = originalBody;
+    document.title = originalTitle;
+    
+    // Success message
+    toast.success('Invoice sent to printer and saved successfully');
+    
+    // Keep the dialog open, don't reset form fields
+    // User can close the dialog manually with the Close button
+  } catch (error) {
+    console.error('Error submitting bill:', error);
+    toast.error(error instanceof Error ? error.message : 'Failed to submit bill');
+  }
+};
+
+// Add a new method to handle clearing the form when user is ready
+const handleClearForm = () => {
+  // Reset form after user explicitly closes
+  setBillItems([]);
+  setVehicleNumber('');
+  setCustomerName('');
+  setMobileNumber('');
+  setCompanyName('');
+  setTotalDiscount('');
+  setPaymentMethod('cash');
+  setNotes('');
+  setGeneratedBill(null);
+  setIsPrintDialogOpen(false);
+  
+  toast.success('Form cleared successfully');
+};
   return (
     <TransitionEffect>
       <div className="min-h-screen bg-background">
@@ -653,14 +658,18 @@ const Billing = () => {
                       </Button>
                     </div>
                     
-                    <Dialog open={isCustomServiceDialogOpen} onOpenChange={setIsCustomServiceDialogOpen}>
-                      <DialogContent className="sm:max-w-[500px]">
-                        <DialogHeader>
-                          <DialogTitle>Add Custom Service</DialogTitle>
-                          <DialogDescription>
-                            Add a custom service with a specific price that isn't in the predefined list.
-                          </DialogDescription>
-                        </DialogHeader>
+                    <Dialog open={isPrintDialogOpen} onOpenChange={(open) => {
+  if (!open) {
+    setIsPrintDialogOpen(false);
+  }
+}}>
+  <DialogContent className="sm:max-w-[500px]">
+    <DialogHeader>
+      <DialogTitle>Invoice Preview</DialogTitle>
+      <DialogDescription>
+        Review the invoice before printing
+      </DialogDescription>
+    </DialogHeader>
                         
                         <div className="grid gap-4 py-4">
                           <div className="space-y-2">
@@ -696,17 +705,18 @@ const Billing = () => {
                           </div>
                         </div>
                         
-                        <DialogFooter>
-                          <Button variant="outline" onClick={() => setIsCustomServiceDialogOpen(false)}>Cancel</Button>
-                          <Button 
-                            className="bg-autospa-red hover:bg-autospa-red/90"
-                            onClick={handleAddCustomService}
-                          >
-                            Add to Bill
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
+                      
+    <DialogFooter>
+      <Button onClick={handlePrintBill} className="bg-autospa-red hover:bg-autospa-red/90">
+        <Printer className="mr-2 h-4 w-4" />
+        Print Invoice
+      </Button>
+      <Button variant="outline" onClick={() => setIsPrintDialogOpen(false)}>
+        Close
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
                     
                     {billItems.length > 0 ? (
                       <div className="rounded-md border overflow-x-auto">
