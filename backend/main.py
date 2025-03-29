@@ -412,31 +412,31 @@ def submit_bill(payload):
         billing_response = insert_payment_data(payload, customer_id)
         print("Step 3 complete: Billing response status:", 'success' if billing_response.data else 'failed')
 
-        print("Step 4: Beginning item processing loop")
-        for index, item in enumerate(payload.items):
-            item_id = item.get("id")
-            item_type = item.get("type", "").lower()
-            item_name = item.get("name")
+        # print("Step 4: Beginning item processing loop")
+        # for index, item in enumerate(payload.items):
+        #     item_id = item.get("id")
+        #     item_type = item.get("type", "").lower()
+        #     item_name = item.get("name")
 
-            print(f"Processing item #{index+1}: ID={item_id}, Type={item_type}, Name={item_name}")
+        #     print(f"Processing item #{index+1}: ID={item_id}, Type={item_type}, Name={item_name}")
 
-            if item_type == "service":
-                print(f"Item {item_id} is a service - skipping inventory update")
-                continue
+        #     if item_type == "service":
+        #         print(f"Item {item_id} is a service - skipping inventory update")
+        #         continue
 
-            try:
-                print(f"Checking for product with ID={item_id} in database")
-                product_check = supabase.table("products").select("id, quantity").eq("id", item_id).execute()
-                if not product_check.data:
-                    print(f"⚠️ CRITICAL: Product with ID={item_id} not found in database")
-                    continue
+        #     try:
+        #         print(f"Checking for product with ID={item_id} in database")
+        #         product_check = supabase.table("products").select("id, quantity").eq("id", item_id).execute()
+        #         if not product_check.data:
+        #             print(f"⚠️ CRITICAL: Product with ID={item_id} not found in database")
+        #             continue
 
-                print("Product found, current quantity:", product_check.data[0].get("quantity", "unknown"))
-                reduce_resp = reduce_quantity(item)
-                print("Reduce quantity response:", reduce_resp)
+        #         print("Product found, current quantity:", product_check.data[0].get("quantity", "unknown"))
+        #         reduce_resp = reduce_quantity(item)
+        #         print("Reduce quantity response:", reduce_resp)
 
-            except Exception as item_error:
-                print(f"Exception while processing item {item_id}: {str(item_error)}")
+        #     except Exception as item_error:
+        #         print(f"Exception while processing item {item_id}: {str(item_error)}")
 
         print("=== All processing completed successfully ===")
         return {
