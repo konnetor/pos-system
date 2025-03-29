@@ -32,3 +32,20 @@ Traceback (most recent call last):
     await getter
 asyncio.exceptions.CancelledError
 
+2025-03-29 14:35:44,204 - uvicorn.error - INFO - Started server process [10252]
+2025-03-29 14:35:44,208 - uvicorn.error - INFO - Waiting for application startup.
+2025-03-29 14:35:44,213 - uvicorn.error - INFO - Application startup complete.
+2025-03-29 14:50:37,303 - uvicorn.error - INFO - Shutting down
+2025-03-29 14:50:37,412 - uvicorn.error - INFO - Waiting for application shutdown.
+2025-03-29 14:50:37,413 - uvicorn.error - INFO - Application shutdown complete.
+2025-03-29 14:50:37,413 - uvicorn.error - INFO - Finished server process [10252]
+2025-03-29 14:50:42,157 - uvicorn.error - INFO - Started server process [13260]
+2025-03-29 14:50:42,157 - uvicorn.error - INFO - Waiting for application startup.
+2025-03-29 14:50:42,157 - uvicorn.error - INFO - Application startup complete.
+2025-03-29 14:50:44,094 - uvicorn.error - INFO - Shutting down
+2025-03-29 14:50:44,195 - uvicorn.error - INFO - Waiting for application shutdown.
+2025-03-29 14:50:44,196 - uvicorn.error - INFO - Application shutdown complete.
+2025-03-29 14:50:44,196 - uvicorn.error - INFO - Finished server process [13260]
+2025-03-29 14:50:47,687 - uvicorn.error - INFO - Started server process [18364]
+2025-03-29 14:50:47,694 - uvicorn.error - INFO - Waiting for application startup.
+2025-03-29 14:50:47,707 - uvicorn.error - INFO - Application startup complete.
