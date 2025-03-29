@@ -279,11 +279,15 @@ const Billing = () => {
   };
   
   const handlePrintBill = async () => {
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
     try {
       if (!generatedBill) {
         toast.error('No bill to submit');
         return;
       }
+      
       
       // Ensure all required customer fields are present
       const customerData = {
@@ -690,7 +694,6 @@ const Billing = () => {
                             />
                           </div>
                         </div>
-                        
                         <DialogFooter>
       <Button
         onClick={handlePrintBill}
