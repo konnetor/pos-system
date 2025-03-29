@@ -1,0 +1,413 @@
+from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, DateTime, ForeignKey
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
+from pydantic import BaseModel
+from datetime import datetime, timedelta
+from typing import Optional, List
+import jwt
+import json
+import bcrypt
+from supabase import create_client, Client
+from typing import List, Optional, Dict, Any, Union
+from datetime import datetime
+import os
+import traceback
+import logging
+# FastAPI app initialization
+app = FastAPI(
+    title="AutoSpa API",
+    description="Backend API for AutoSpa vehicle service management system",
+    version="1.0.0"
+)
+
+# CORS configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, replace with specific origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Database configuration
+DATABASE_URL = "sqlite:///./autospa.db"
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+SUPABASE_URL = "https://uhntubkqjzoftmkknvqr.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVobnR1YmtxanpvZnRta2tudnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIzOTAxNzAsImV4cCI6MjA1Nzk2NjE3MH0.msCbxM2Zuvjb091xy435EijWPsaEb9HUt93FLEDOUo8"
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# Health check endpoint
+@app.get("/health")
+def health_check():
+    return {"status": "healthy check is success", "timestamp": datetime.utcnow()}
+
+class ProductCreate(BaseModel):
+    name: str
+    price: float
+    code: str
+    quantity: int
+    discount: Optional[float] = 0
+    user_type: Optional[str] = None
+
+class ProductUpdate(BaseModel):
+    name: Optional[str] = None
+    price: Optional[float] = None
+    code: Optional[str] = None
+    quantity: Optional[int] = None
+    discount: Optional[float] = None
+    user_type: Optional[str] = None
+
+@app.post("/api/edit_products")
+async def edit_product(product: ProductUpdate):
+    try:
+        # Get product code from the request body
+        product_code = product.code
+        
+        if not product_code:
+            raise HTTPException(status_code=400, detail="Product code is required")
+            
+        # Create update data dictionary excluding None values
+        update_data = {k: v for k, v in product.dict().items() if v is not None and k != 'code'}
+        update_data['edited_at'] = datetime.utcnow().isoformat()
+
+        if 'user_type' in update_data:
+            update_data['edited_by'] = update_data['user_type']
+        
+        if not update_data:
+            raise HTTPException(status_code=400, detail="No valid update data provided")
+
+        # Update the product in Supabase by matching product_code
+        response = supabase.table('products')\
+            .update(update_data)\
+            .eq('code', product_code)\
+            .execute()
+        
+        if response.data and len(response.data) > 0:
+            return response.data[0]
+        else:
+            raise HTTPException(status_code=404, detail="Product not found")
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/get_products")
+async def get_products():
+    try:
+        # Fetch all products from Supabase
+        response = supabase.table('products').select("*").execute()
+        
+        if response.data:
+            return response.data
+        else:
+            return []
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/add_products")
+async def add_product(product: ProductCreate):
+
+    try:
+        edited_by = 'no'
+        # Insert the product into Supabase
+        response = supabase.table('products').insert({
+            "name": product.name,
+            "price": product.price,
+            "code": product.code,
+            "quantity": product.quantity,
+            "discount": product.discount,
+            "user_type": product.user_type,
+            "edited_by":edited_by,
+        }).execute()
+        
+        # Check if the insertion was successful
+        if response.data:
+            return response.data[0]
+        else:
+            raise HTTPException(status_code=400, detail="Failed to add product")
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+class ServiceCreate(BaseModel):
+    name: str
+    price: float
+    code: str
+    description: Optional[str] = None
+    user_type: Optional[str] = None  # Add user_type to the model
+
+
+@app.get("/api/get_services")
+async def get_services():
+    try:
+        # Fetch all services from Supabase
+        response = supabase.table('services').select("*").execute()
+        
+        if response.data:
+            return response.data
+        else:
+            return []
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/add_service")
+async def add_service(service: ServiceCreate):
+    try:
+        # Extract user_type but don't use it directly if the column doesn't exist
+        user_type = service.user_type
+        
+        # Create base service data - excluding user_type since it's not in the table
+        service_data = {
+            'name': service.name,
+            'price': service.price,
+            'code': service.code,
+            'description': service.description
+        }
+        
+        # Add only timestamps that are confirmed to exist in your table
+        current_time = datetime.utcnow().isoformat()
+        service_data.update({
+            'created_at': current_time,
+            'updated_at': current_time
+        })
+        
+        # Optionally add edited_by if it exists in your table
+        if user_type:
+            service_data['user_type'] = user_type
+
+        # Insert the service into Supabase
+        response = supabase.table('services')\
+            .insert(service_data)\
+            .execute()
+        
+        if response.data and len(response.data) > 0:
+            return response.data[0]
+        else:
+            raise HTTPException(status_code=500, detail="Failed to add service")
+            
+    except Exception as e:
+        # More detailed error handling
+        error_message = str(e)
+        print(f"Error adding service: {error_message}")
+        
+        if "duplicate" in error_message.lower() and "code" in error_message.lower():
+            raise HTTPException(status_code=400, detail="Service code already exists")
+        
+        raise HTTPException(status_code=500, detail=error_message)
+
+
+class ServiceUpdate(BaseModel):
+    name: Optional[str] = None
+    price: Optional[float] = None
+    description: Optional[str] = None
+    user_type: Optional[str] = None
+    code: str  # Added required code field
+
+@app.get("/api/get_all_data")
+async def get_all_data():
+    try:
+        # Fetch all products and services from Supabase
+        products_response = supabase.table('products').select("*").execute()
+        services_response = supabase.table('services').select("*").execute()
+        
+        return {
+            "products": products_response.data if products_response.data else [],
+            "services": services_response.data if services_response.data else []
+        }
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/get_summary_data")
+async def get_summary_data():
+    try:
+        # Get current date in ISO format for comparison
+        today = datetime.utcnow().date().isoformat()
+        
+        # Get total products and services
+        products_response = supabase.table('products').select('id').execute()
+        services_response = supabase.table('services').select('id').execute()
+        
+        # Get today's invoices
+        billing_response = supabase.table('billing')\
+            .select('id')\
+            .gte('payment_date', today)\
+            .lt('payment_date', (datetime.utcnow() + timedelta(days=1)).date().isoformat())\
+            .execute()
+        
+        # Get low stock products (quantity < 10)
+        low_stock_response = supabase.table('products')\
+            .select('id')\
+            .lt('quantity', 10)\
+            .execute()
+        
+        return {
+            "total_products": len(products_response.data) if products_response.data else 0,
+            "total_services": len(services_response.data) if services_response.data else 0,
+            "total_bills": len(billing_response.data) if billing_response.data else 0,
+            "low_stock_count": len(low_stock_response.data) if low_stock_response.data else 0
+        }
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/edit_services")
+async def edit_service(service: ServiceUpdate):
+    try:
+        # Get service code from the request body
+        service_code = service.code
+        
+        if not service_code:
+            raise HTTPException(status_code=400, detail="Service code is required")
+            
+        # Create update data dictionary excluding None values
+        update_data = {k: v for k, v in service.dict().items() if v is not None and k != 'code'}
+        update_data['updated_at'] = datetime.utcnow().isoformat()
+        update_data['edited_at'] = datetime.utcnow().isoformat()
+        
+        # Set edited_by from user_type
+        if 'user_type' in update_data:
+            update_data['edited_by'] = update_data['user_type']
+            del update_data['user_type']  # Remove user_type from update data
+        
+        if not update_data:
+            raise HTTPException(status_code=400, detail="No valid update data provided")
+
+        # Update the service in Supabase by matching service_code
+        response = supabase.table('services')\
+            .update(update_data)\
+            .eq('code', service_code)\
+            .execute()
+        
+        if response.data and len(response.data) > 0:
+            return response.data[0]
+        else:
+            raise HTTPException(status_code=404, detail="Service not found")
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+logger = logging.getLogger("uvicorn.error")
+
+class CustomerInfo(BaseModel):
+    name: str
+    mobile: str
+    vehicleNumber: str
+    company: str
+
+class BillPayload(BaseModel):
+    date: datetime
+    customer: CustomerInfo
+    discount: float
+    items: list  # Each item is a dict with details such as id, type, name, code, price, quantity, discount, etc.
+    paymentMethod: str
+    subTotal: float
+    total: float
+
+# --- Helper Functions ---
+def insert_payment_data(payload: BillPayload, customer_id: int):
+    """
+    Insert billing record into the billing table.
+    """
+    billing_data = {
+        "customer_id": customer_id,
+        "items": payload.items,  # Assuming your billing table column is of type JSONB
+        "payment_method": payload.paymentMethod,
+        "sub_total": payload.subTotal,
+        "total": payload.total,
+        "vehicle_no": payload.customer.vehicleNumber,
+        "payment_date": payload.date.isoformat()
+    }
+    logger.info("Inserting billing data: %s", billing_data)
+    response = supabase.table("billing").insert(billing_data).execute()
+    return response
+def reduce_quantity(item: dict):
+    """
+    Reduce the available quantity of a product by the quantity specified in the item.
+    Skips custom items, items with ID 0, and service items.
+    """
+    # Skip custom items, items with ID 0, or service type items
+    if item.get("id") == 0 or item.get("code") == "CUSTOM" or item.get("type") == "service":
+        logger.info("Skipping quantity reduction for item: %s (type: %s)", 
+                   item.get("name", "Unknown"), item.get("type", "Unknown"))
+        return None
+    
+    try:
+        # First, fetch the current quantity from the products table
+        product_response = supabase.table("products").select("quantity").eq("id", item["id"]).execute()
+        
+        if not product_response.data or len(product_response.data) == 0:
+            logger.warning(f"Product with id {item['id']} not found in database. Skipping quantity reduction.")
+            return None
+        
+        current_quantity = product_response.data[0]["quantity"]
+        new_quantity = current_quantity - item["quantity"]
+        
+        # Ensure quantity doesn't go below zero
+        if new_quantity < 0:
+            logger.warning(f"Attempting to reduce product id {item['id']} below zero. Setting to 0 instead.")
+            new_quantity = 0
+        
+        logger.info("Reducing product id %s quantity from %s to %s", item["id"], current_quantity, new_quantity)
+        update_response = supabase.table("products").update({"quantity": new_quantity}).eq("id", item["id"]).execute()
+        return update_response
+        
+    except Exception as e:
+        logger.error(f"Error reducing quantity for product {item.get('id')}: {str(e)}")
+        # Instead of raising an exception, we log it and continue
+        return None
+
+# --- Main Endpoint ---
+@app.post("/api/submit_bill")
+def submit_bill(payload: BillPayload):
+    logger.info("Received payload: %s", payload.json())
+    try:
+        # Insert customer data into the 'customer' table
+        customer_response = supabase.table("customer").insert({
+            "name": payload.customer.name,
+            "mobile_no": payload.customer.mobile,
+            "vehicel_no": payload.customer.vehicleNumber,  # Ensure spelling matches your DB column name
+            "company": payload.customer.company,
+            "payment": payload.total,
+            "payment_date": payload.date.isoformat()
+        }).execute()
+
+        logger.info("Customer insert response: %s", customer_response)
+        if not customer_response.data:
+            raise HTTPException(status_code=400, detail="Failed to add customer")
+        
+        customer_id = customer_response.data[0]["id"]
+        logger.info("Customer inserted with id: %s", customer_id)
+
+        # Insert billing/payment data into the billing table
+        billing_response = insert_payment_data(payload, customer_id)
+        logger.info("Billing insert response: %s", billing_response)
+        if hasattr(billing_response, "error") and billing_response.error:
+            logger.error("Error inserting billing record: %s", billing_response.error)
+            raise HTTPException(status_code=400, detail=str(billing_response.error))
+
+        # Loop through each item and reduce the product quantity accordingly
+        for item in payload.items:
+            reduce_resp = reduce_quantity(item)
+            logger.info("Reduced quantity for item id %s, update response: %s", item.get("id"), reduce_resp)
+
+        return {
+            "customer_id": customer_id,
+            "billing_id": billing_response.data[0]["id"],
+            "message": "Customer, billing data inserted and product quantities updated successfully."
+        }
+        
+    except Exception as e:
+        logger.error("Exception occurred in submit_bill", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
