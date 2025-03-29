@@ -398,9 +398,14 @@ def submit_bill(payload: BillPayload):
             raise HTTPException(status_code=400, detail=str(billing_response.error))
 
         # Loop through each item and reduce the product quantity accordingly
-        # for item in payload.items:
-        #     reduce_resp = reduce_quantity(item)
-        #     logger.info("Reduced quantity for item id %s, update response: %s", item.get("id"), reduce_resp)
+        for item in payload.items:
+            try:
+                reduce_resp = reduce_quantity(item)
+                logger.info("Reduced quantity for item id %s, update response: %s", item.get("id"), reduce_resp)
+            except Exception as item_error:
+                # Log the error but continue processing
+                logger.error(f"Error processing item {item.get('id')}: {str(item_error)}")
+                # Don't raise an exception, just continue with the next item
 
         return {
             "customer_id": customer_id,
@@ -408,6 +413,9 @@ def submit_bill(payload: BillPayload):
             "message": "Customer, billing data inserted and product quantities updated successfully."
         }
         
+    except HTTPException as http_ex:
+        # Re-raise HTTP exceptions
+        raise http_ex
     except Exception as e:
         logger.error("Exception occurred in submit_bill", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred while processing your request")
