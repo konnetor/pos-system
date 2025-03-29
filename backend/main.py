@@ -36,17 +36,21 @@ import logging
 from logging.handlers import RotatingFileHandler
 
 # Set up a dedicated file logger
+# Set up a dedicated file logger
 file_handler = RotatingFileHandler('main.log', maxBytes=10485760, backupCount=5)
 file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 file_handler.setLevel(logging.DEBUG)
 
-# Add the handler to the root logger
-logging.getLogger().addHandler(file_handler)
-logging.getLogger().setLevel(logging.DEBUG)
+# Apply handler to root logger
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.DEBUG)
+root_logger.addHandler(file_handler)
 
-# Also add it to your application logger
-logger = logging.getLogger("uvicorn.error")
-logger.addHandler(file_handler)
+# ✅ Also define a separate app logger
+app_logger = logging.getLogger("autospa")
+app_logger.setLevel(logging.DEBUG)
+app_logger.addHandler(file_handler)
+
 # Database configuration
 DATABASE_URL = "sqlite:///./autospa.db"
 engine = create_engine(DATABASE_URL)

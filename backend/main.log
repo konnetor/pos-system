@@ -49,3 +49,7 @@ asyncio.exceptions.CancelledError
 2025-03-29 14:50:47,687 - uvicorn.error - INFO - Started server process [18364]
 2025-03-29 14:50:47,694 - uvicorn.error - INFO - Waiting for application startup.
 2025-03-29 14:50:47,707 - uvicorn.error - INFO - Application startup complete.
+2025-03-29 15:04:17,076 - uvicorn.error - INFO - Shutting down
+2025-03-29 15:04:17,193 - uvicorn.error - INFO - Waiting for application shutdown.
+2025-03-29 15:04:17,196 - uvicorn.error - INFO - Application shutdown complete.
+2025-03-29 15:04:17,196 - uvicorn.error - INFO - Finished server process [18364]
