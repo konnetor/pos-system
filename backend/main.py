@@ -398,9 +398,9 @@ def submit_bill(payload: BillPayload):
             raise HTTPException(status_code=400, detail=str(billing_response.error))
 
         # Loop through each item and reduce the product quantity accordingly
-        for item in payload.items:
-            reduce_resp = reduce_quantity(item)
-            logger.info("Reduced quantity for item id %s, update response: %s", item.get("id"), reduce_resp)
+        # for item in payload.items:
+        #     reduce_resp = reduce_quantity(item)
+        #     logger.info("Reduced quantity for item id %s, update response: %s", item.get("id"), reduce_resp)
 
         return {
             "customer_id": customer_id,
