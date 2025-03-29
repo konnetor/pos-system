@@ -32,6 +32,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+import logging
+from logging.handlers import RotatingFileHandler
+
+# Set up a dedicated file logger
+file_handler = RotatingFileHandler('main.log', maxBytes=10485760, backupCount=5)
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+file_handler.setLevel(logging.DEBUG)
+
+# Add the handler to the root logger
+logging.getLogger().addHandler(file_handler)
+logging.getLogger().setLevel(logging.DEBUG)
+
+# Also add it to your application logger
+logger = logging.getLogger("uvicorn.error")
+logger.addHandler(file_handler)
 # Database configuration
 DATABASE_URL = "sqlite:///./autospa.db"
 engine = create_engine(DATABASE_URL)
@@ -368,12 +383,14 @@ def reduce_quantity(item: dict):
         # Instead of raising an exception, we log it and continue
         return None
 
-# --- Main Endpoint ---
 @app.post("/api/submit_bill")
 def submit_bill(payload: BillPayload):
-    logger.info("Received payload: %s", payload.json())
+    logger.info("=== Starting submit_bill endpoint ===")
+    logger.info(f"Received payload with {len(payload.items)} items")
+    
     try:
-        # Insert customer data into the 'customer' table
+        # Track all execution steps for debugging
+        logger.info("Step 1: Inserting customer data")
         customer_response = supabase.table("customer").insert({
             "name": payload.customer.name,
             "mobile_no": payload.customer.mobile,
@@ -383,60 +400,64 @@ def submit_bill(payload: BillPayload):
             "payment_date": payload.date.isoformat()
         }).execute()
 
-        logger.info("Customer insert response: %s", customer_response)
+        logger.info(f"Step 1 complete: Customer response data: {customer_response.data}")
         if not customer_response.data:
+            logger.error("Failed to add customer - no data returned from insert operation")
             raise HTTPException(status_code=400, detail="Failed to add customer")
         
         customer_id = customer_response.data[0]["id"]
-        logger.info("Customer inserted with id: %s", customer_id)
+        logger.info(f"Step 2: Preparing to insert billing data for customer_id={customer_id}")
 
         # Insert billing/payment data into the billing table
-        try:
-            billing_response = insert_payment_data(payload, customer_id)
-            logger.info("Billing insert response: %s", billing_response)
-            if hasattr(billing_response, "error") and billing_response.error:
-                logger.error("Error inserting billing record: %s", billing_response.error)
-                raise HTTPException(status_code=400, detail="Error inserting billing record")
-        except Exception as billing_error:
-            logger.error(f"Error in billing data: {str(billing_error)}")
-            raise HTTPException(status_code=400, detail="Error processing billing information")
-
-        billing_id = billing_response.data[0]["id"] if billing_response.data else None
-
-        # Loop through each item and reduce the product quantity accordingly
-        skipped_items = []
-        for item in payload.items:
+        logger.info("Step 3: Inserting billing data")
+        billing_response = insert_payment_data(payload, customer_id)
+        logger.info(f"Step 3 complete: Billing response status: {'success' if billing_response.data else 'failed'}")
+        
+        logger.info("Step 4: Beginning item processing loop")
+        # Before processing items, log each item's details
+        for index, item in enumerate(payload.items):
+            item_id = item.get("id")
+            item_type = item.get("type")
+            item_name = item.get("name")
+            
+            logger.info(f"Processing item #{index+1}: ID={item_id}, Type={item_type}, Name={item_name}")
+            
+            # Check if this is a product item requiring quantity update
+            if item_type == "service":
+                logger.info(f"Item {item_id} is a service - skipping inventory update")
+                continue
+            
+            # Add extra logging for product lookup
             try:
+                logger.info(f"Checking for product with ID={item_id} in database")
+                product_check = supabase.table("products").select("id, quantity").eq("id", item_id).execute()
+                if not product_check.data or len(product_check.data) == 0:
+                    # ❌ THIS IS LIKELY WHERE THE ERROR IS HAPPENING
+                    logger.warning(f"⚠️ CRITICAL: Product with ID={item_id} not found in database")
+                    # Don't raise exception here, log and continue
+                    continue
+                
+                logger.info(f"Product found, current quantity: {product_check.data[0].get('quantity', 'unknown')}")
+                
+                # Call reduce_quantity with extra debugging
+                logger.info(f"Calling reduce_quantity for item {item_id}")
                 reduce_resp = reduce_quantity(item)
-                if reduce_resp is None:
-                    skipped_items.append(item.get("name", f"Item ID {item.get('id')}"))
-                logger.info("Processed item id %s, update response: %s", item.get("id"), reduce_resp)
+                logger.info(f"Reduce quantity response: {reduce_resp}")
+                
             except Exception as item_error:
-                # Log the error but continue processing
-                logger.error(f"Error processing item {item.get('id')}: {str(item_error)}")
-                skipped_items.append(item.get("name", f"Item ID {item.get('id')}"))
-
-        result_message = "Customer and billing data inserted successfully."
-        if skipped_items:
-            result_message += f" Note: Some items were not processed for inventory updates: {', '.join(skipped_items)}"
-
+                logger.error(f"Exception while processing item {item_id}: {str(item_error)}", exc_info=True)
+        
+        logger.info("=== All processing completed successfully ===")
         return {
-            "success": True,
             "customer_id": customer_id,
-            "billing_id": billing_id,
-            "message": result_message
+            "billing_id": billing_response.data[0]["id"] if billing_response.data else None,
+            "message": "Customer, billing data inserted and product quantities updated successfully."
         }
         
     except HTTPException as http_ex:
-        # Re-raise HTTP exceptions with sanitized message
-        logger.error(f"HTTP Exception: {http_ex.detail}")
-        return {
-            "success": False,
-            "message": http_ex.detail if "customer" in str(http_ex.detail) else "Error processing request"
-        }
+        logger.error(f"HTTPException in submit_bill: {http_ex.detail}", exc_info=True)
+        raise http_ex
     except Exception as e:
-        logger.error("Exception occurred in submit_bill", exc_info=True)
-        return {
-            "success": False,
-            "message": "An error occurred while processing your request"
-        }
+        logger.error(f"Unhandled exception in submit_bill: {str(e)}", exc_info=True)
+        # Return a generic error to avoid exposing internal details
+        raise HTTPException(status_code=500, detail="An error occurred while processing your request")
