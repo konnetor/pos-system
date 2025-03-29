@@ -362,7 +362,7 @@ def insert_payment_data(payload, customer_id):
     return response
 
 def reduce_quantity(item):
-    if item.get("id") == 0 or item.get("code") == "CUSTOM" or item.get("type") == "service":
+    if item.get("id") == 0 or item.get("code") == "CUSTOM" or item.get("type", "").lower() == "service":
         print("Skipping quantity reduction for item:", item.get("name", "Unknown"), "(type:", item.get("type", "Unknown"), ")")
         return None
 
@@ -370,7 +370,7 @@ def reduce_quantity(item):
         product_response = supabase.table("products").select("quantity").eq("id", item["id"]).execute()
 
         if not product_response.data:
-            print(f"Product with id {item['id']} not found in database. Skipping quantity reduction.")
+            print(f"Product with id {item['id']} not found in database. Skipping.")
             return None
 
         current_quantity = product_response.data[0]["quantity"]
@@ -415,7 +415,7 @@ def submit_bill(payload):
         print("Step 4: Beginning item processing loop")
         for index, item in enumerate(payload.items):
             item_id = item.get("id")
-            item_type = item.get("type")
+            item_type = item.get("type", "").lower()
             item_name = item.get("name")
 
             print(f"Processing item #{index+1}: ID={item_id}, Type={item_type}, Name={item_name}")
