@@ -377,7 +377,7 @@ def submit_bill(payload: BillPayload):
         customer_response = supabase.table("customer").insert({
             "name": payload.customer.name,
             "mobile_no": payload.customer.mobile,
-            "vehicel_no": payload.customer.vehicleNumber,  # Ensure spelling matches your DB column name
+            "vehicel_no": payload.customer.vehicleNumber,
             "company": payload.customer.company,
             "payment": payload.total,
             "payment_date": payload.date.isoformat()
@@ -391,31 +391,52 @@ def submit_bill(payload: BillPayload):
         logger.info("Customer inserted with id: %s", customer_id)
 
         # Insert billing/payment data into the billing table
-        billing_response = insert_payment_data(payload, customer_id)
-        logger.info("Billing insert response: %s", billing_response)
-        if hasattr(billing_response, "error") and billing_response.error:
-            logger.error("Error inserting billing record: %s", billing_response.error)
-            raise HTTPException(status_code=400, detail=str(billing_response.error))
+        try:
+            billing_response = insert_payment_data(payload, customer_id)
+            logger.info("Billing insert response: %s", billing_response)
+            if hasattr(billing_response, "error") and billing_response.error:
+                logger.error("Error inserting billing record: %s", billing_response.error)
+                raise HTTPException(status_code=400, detail="Error inserting billing record")
+        except Exception as billing_error:
+            logger.error(f"Error in billing data: {str(billing_error)}")
+            raise HTTPException(status_code=400, detail="Error processing billing information")
+
+        billing_id = billing_response.data[0]["id"] if billing_response.data else None
 
         # Loop through each item and reduce the product quantity accordingly
+        skipped_items = []
         for item in payload.items:
             try:
                 reduce_resp = reduce_quantity(item)
-                logger.info("Reduced quantity for item id %s, update response: %s", item.get("id"), reduce_resp)
+                if reduce_resp is None:
+                    skipped_items.append(item.get("name", f"Item ID {item.get('id')}"))
+                logger.info("Processed item id %s, update response: %s", item.get("id"), reduce_resp)
             except Exception as item_error:
                 # Log the error but continue processing
                 logger.error(f"Error processing item {item.get('id')}: {str(item_error)}")
-                # Don't raise an exception, just continue with the next item
+                skipped_items.append(item.get("name", f"Item ID {item.get('id')}"))
+
+        result_message = "Customer and billing data inserted successfully."
+        if skipped_items:
+            result_message += f" Note: Some items were not processed for inventory updates: {', '.join(skipped_items)}"
 
         return {
+            "success": True,
             "customer_id": customer_id,
-            "billing_id": billing_response.data[0]["id"],
-            "message": "Customer, billing data inserted and product quantities updated successfully."
+            "billing_id": billing_id,
+            "message": result_message
         }
         
     except HTTPException as http_ex:
-        # Re-raise HTTP exceptions
-        raise http_ex
+        # Re-raise HTTP exceptions with sanitized message
+        logger.error(f"HTTP Exception: {http_ex.detail}")
+        return {
+            "success": False,
+            "message": http_ex.detail if "customer" in str(http_ex.detail) else "Error processing request"
+        }
     except Exception as e:
         logger.error("Exception occurred in submit_bill", exc_info=True)
-        raise HTTPException(status_code=500, detail="An error occurred while processing your request")
+        return {
+            "success": False,
+            "message": "An error occurred while processing your request"
+        }
