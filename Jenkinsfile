@@ -45,6 +45,8 @@ pipeline {
 
                 # Start frontend
                 cd ../frontend
+                rm -rf node_modules package-lock.json
+                npm install
                 npm run build
                 nohup npx vite --host --port 3000 > ../frontend.log 2>&1 &
                 '
