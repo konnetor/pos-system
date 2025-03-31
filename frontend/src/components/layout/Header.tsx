@@ -27,8 +27,8 @@ const Header: React.FC<HeaderProps> = ({
     { name: "Products", path: "/dashboard/products", admin: false },
     { name: "Services", path: "/dashboard/services", admin: false },
     { name: "Billing", path: "/dashboard/billing", admin: false },
-    { name: "Customers", path: "/dashboard/customers", admin: true },
-    { name: "Reports", path: "/dashboard/reports", admin: true },
+    // { name: "Customers", path: "/dashboard/customers", admin: true },
+    // { name: "Reports", path: "/dashboard/reports", admin: true },
   ];
   
   const visibleNavItems = isAdmin 
