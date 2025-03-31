@@ -45,7 +45,6 @@ pipeline {
 
                 # Start frontend
                 cd ../frontend
-                npm install
                 npm run build
                 nohup npx vite --host --port 3000 > ../frontend.log 2>&1 &
                 '
