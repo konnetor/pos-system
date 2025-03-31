@@ -357,40 +357,42 @@ def insert_payment_data(payload, customer_id):
         "vehicle_no": payload.customer.vehicleNumber,
         "payment_date": payload.date.isoformat()
     }
-    print("Inserting billing data:", billing_data)
+    logger.info("Inserting billing data: %s", billing_data)
     response = supabase.table("billing").insert(billing_data).execute()
     return response
 
 def reduce_quantity(item):
-    if item.get("id") == 0 or item.get("code") == "CUSTOM" or item.get("type", "").lower() == "service":
-        print("Skipping quantity reduction for item:", item.get("name", "Unknown"), "(type:", item.get("type", "Unknown"), ")")
+    if item.get("id") == 0 or item.get("code") == "CUSTOM" or item.get("type") == "service":
+        logger.info("Skipping quantity reduction for item: %s (type: %s)",
+                    item.get("name", "Unknown"), item.get("type", "Unknown"))
         return None
 
     try:
         product_response = supabase.table("products").select("quantity").eq("id", item["id"]).execute()
 
         if not product_response.data:
-            print(f"Product with id {item['id']} not found in database. Skipping.")
+            logger.warning(f"Product with id {item['id']} not found in database. Skipping quantity reduction.")
             return None
 
         current_quantity = product_response.data[0]["quantity"]
         new_quantity = max(0, current_quantity - item["quantity"])
 
-        print("Reducing product id", item["id"], "quantity from", current_quantity, "to", new_quantity)
+        logger.info("Reducing product id %s quantity from %s to %s", item["id"], current_quantity, new_quantity)
         update_response = supabase.table("products").update({"quantity": new_quantity}).eq("id", item["id"]).execute()
         return update_response
 
     except Exception as e:
-        print(f"Error reducing quantity for product {item.get('id')}: {str(e)}")
+        logger.error(f"Error reducing quantity for product {item.get('id')}: {str(e)}")
         return None
 
 @app.post("/api/submit_bill")
-def submit_bill(payload):
-    print("=== Starting submit_bill endpoint ===")
-    print(f"Received payload with {len(payload.items)} items")
+async def submit_bill(payload: BillPayload):  # FastAPI will automatically look for this in the request body
+    # Your implementation remains the same
+    logger.info("=== Starting submit_bill endpoint ===")
+    logger.info(f"Received payload with {len(payload.items)} items")
 
     try:
-        print("Step 1: Inserting customer data")
+        logger.info("Step 1: Inserting customer data")
         customer_response = supabase.table("customer").insert({
             "name": payload.customer.name,
             "mobile_no": payload.customer.mobile,
@@ -400,45 +402,45 @@ def submit_bill(payload):
             "payment_date": payload.date.isoformat()
         }).execute()
 
-        print("Step 1 complete: Customer response data:", customer_response.data)
+        logger.info(f"Step 1 complete: Customer response data: {customer_response.data}")
         if not customer_response.data:
-            print("Failed to add customer - no data returned from insert operation")
+            logger.error("Failed to add customer - no data returned from insert operation")
             raise HTTPException(status_code=400, detail="Failed to add customer")
 
         customer_id = customer_response.data[0]["id"]
-        print("Step 2: Preparing to insert billing data for customer_id=", customer_id)
+        logger.info(f"Step 2: Preparing to insert billing data for customer_id={customer_id}")
 
-        print("Step 3: Inserting billing data")
+        logger.info("Step 3: Inserting billing data")
         billing_response = insert_payment_data(payload, customer_id)
-        print("Step 3 complete: Billing response status:", 'success' if billing_response.data else 'failed')
+        logger.info(f"Step 3 complete: Billing response status: {'success' if billing_response.data else 'failed'}")
 
-        # print("Step 4: Beginning item processing loop")
-        # for index, item in enumerate(payload.items):
-        #     item_id = item.get("id")
-        #     item_type = item.get("type", "").lower()
-        #     item_name = item.get("name")
+        logger.info("Step 4: Beginning item processing loop")
+        for index, item in enumerate(payload.items):
+            item_id = item.get("id")
+            item_type = item.get("type")
+            item_name = item.get("name")
 
-        #     print(f"Processing item #{index+1}: ID={item_id}, Type={item_type}, Name={item_name}")
+            logger.info(f"Processing item #{index+1}: ID={item_id}, Type={item_type}, Name={item_name}")
 
-        #     if item_type == "service":
-        #         print(f"Item {item_id} is a service - skipping inventory update")
-        #         continue
+            if item_type == "service":
+                logger.info(f"Item {item_id} is a service - skipping inventory update")
+                continue
 
-        #     try:
-        #         print(f"Checking for product with ID={item_id} in database")
-        #         product_check = supabase.table("products").select("id, quantity").eq("id", item_id).execute()
-        #         if not product_check.data:
-        #             print(f"⚠️ CRITICAL: Product with ID={item_id} not found in database")
-        #             continue
+            try:
+                logger.info(f"Checking for product with ID={item_id} in database")
+                product_check = supabase.table("products").select("id, quantity").eq("id", item_id).execute()
+                if not product_check.data:
+                    logger.warning(f"⚠️ CRITICAL: Product with ID={item_id} not found in database")
+                    continue
 
-        #         print("Product found, current quantity:", product_check.data[0].get("quantity", "unknown"))
-        #         reduce_resp = reduce_quantity(item)
-        #         print("Reduce quantity response:", reduce_resp)
+                logger.info(f"Product found, current quantity: {product_check.data[0].get('quantity', 'unknown')}")
+                reduce_resp = reduce_quantity(item)
+                logger.info(f"Reduce quantity response: {reduce_resp}")
 
-        #     except Exception as item_error:
-        #         print(f"Exception while processing item {item_id}: {str(item_error)}")
+            except Exception as item_error:
+                logger.error(f"Exception while processing item {item_id}: {str(item_error)}", exc_info=True)
 
-        print("=== All processing completed successfully ===")
+        logger.info("=== All processing completed successfully ===")
         return {
             "customer_id": customer_id,
             "billing_id": billing_response.data[0]["id"] if billing_response.data else None,
@@ -446,8 +448,8 @@ def submit_bill(payload):
         }
 
     except HTTPException as http_ex:
-        print(f"HTTPException in submit_bill: {http_ex.detail}")
+        logger.error(f"HTTPException in submit_bill: {http_ex.detail}", exc_info=True)
         raise http_ex
     except Exception as e:
-        print(f"Unhandled exception in submit_bill: {str(e)}")
+        logger.error(f"Unhandled exception in submit_bill: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="An error occurred while processing your request")

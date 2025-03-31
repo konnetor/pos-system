@@ -278,92 +278,89 @@ const Billing = () => {
     toast.success('Bill generated successfully');
   };
   
-  const handlePrintBill = async () => {
+const handlePrintBill = async () => {
+  try {
+    if (!generatedBill) {
+      toast.error('No bill to submit');
+      return;
+    }
+    
+    // Ensure all required customer fields are present (even if empty strings)
+    const customerData = {
+      name: generatedBill.customer.name || "",
+      mobile: generatedBill.customer.mobile || "",
+      vehicleNumber: generatedBill.customer.vehicleNumber,
+      company: generatedBill.customer.company || ""
+    };
 
+    // Submit bill to backend
+    const response = await fetch(getApiUrl('api/submit_bill'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        date: generatedBill.date,
+        customer: customerData,
+        items: generatedBill.items,
+        subTotal: generatedBill.subTotal,
+        discount: generatedBill.discount,
+        total: generatedBill.total,
+        paymentMethod: generatedBill.paymentMethod,
+        notes: generatedBill.notes
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to submit bill');
+    }
+
+    // Create a new window for printing instead of modifying the current page
     const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-    try {
-      if (!generatedBill) {
-        toast.error('No bill to submit');
-        return;
-      }
+    
+    if (!printWindow) {
+      toast.error('Failed to open print window. Please check your popup blocker settings.');
+      return;
+    }
+    
+    // Create print-specific styles
+    const printStyles = `
+      @page { margin: 15mm; }
+      body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: white; }
+      .print-content { max-width: 800px; margin: 0 auto; padding: 20px; }
+      .print-header { text-align: center; margin-bottom: 25px; }
+      .logo { max-width: 120px; height: auto; margin-bottom: 12px; }
+      .company-name { font-size: 24px; font-weight: bold; margin: 5px 0; color: #1a1a1a; }
+      .company-subtitle { font-size: 16px; color: #4a4a4a; margin-bottom: 8px; }
       
+      .invoice-info { display: flex; justify-content: space-between; margin-bottom: 25px; }
+      .bill-to, .invoice-details { width: 48%; }
+      .bill-to div, .invoice-details div { margin-bottom: 4px; }
+      .invoice-details { text-align: right; }
       
-      // Ensure all required customer fields are present
-      const customerData = {
-        name: generatedBill.customer.name || "",
-        mobile: generatedBill.customer.mobile || "",
-        vehicleNumber: generatedBill.customer.vehicleNumber,
-        company: generatedBill.customer.company || ""
-      };
-  
-      // Submit bill to backend
-      const response = await fetch(getApiUrl('api/submit_bill'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          date: generatedBill.date,
-          customer: customerData,
-          items: generatedBill.items,
-          subTotal: generatedBill.subTotal,
-          discount: generatedBill.discount,
-          total: generatedBill.total,
-          paymentMethod: generatedBill.paymentMethod,
-          notes: generatedBill.notes
-        })
-      });
-  
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'Failed to submit bill');
-      }
-  
-      // IMPORTANT: Use a new window for printing instead of modifying the current document
-      const printWindow = window.open('', '_blank');
+      table { width: 100%; border-collapse: collapse; margin: 25px 0; }
+      th { background-color: #f8f9fa; color: #1a1a1a; font-weight: 600; padding: 12px 8px; text-align: left; border-bottom: 2px solid #dee2e6; }
+      td { padding: 12px 8px; text-align: left; border-bottom: 1px solid #dee2e6; }
+      th.text-right, td.text-right { text-align: right; }
       
-      if (!printWindow) {
-        toast.error('Failed to open print window. Please check if pop-ups are blocked.');
-        return;
-      }
-  
-      // Create print-specific styles
-      const printStyles = `
-        @page { margin: 15mm; }
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: white; }
-        .print-content { max-width: 800px; margin: 0 auto; padding: 20px; }
-        .print-header { text-align: center; margin-bottom: 25px; }
-        .logo { max-width: 120px; height: auto; margin-bottom: 12px; }
-        .company-name { font-size: 24px; font-weight: bold; margin: 5px 0; color: #1a1a1a; }
-        .company-subtitle { font-size: 16px; color: #4a4a4a; margin-bottom: 8px; }
-        
-        .invoice-info { display: flex; justify-content: space-between; margin-bottom: 25px; }
-        .bill-to, .invoice-details { width: 48%; }
-        .bill-to div, .invoice-details div { margin-bottom: 4px; }
-        .invoice-details { text-align: right; }
-        
-        table { width: 100%; border-collapse: collapse; margin: 25px 0; }
-        th { background-color: #f8f9fa; color: #1a1a1a; font-weight: 600; padding: 12px 8px; text-align: left; border-bottom: 2px solid #dee2e6; }
-        td { padding: 12px 8px; text-align: left; border-bottom: 1px solid #dee2e6; }
-        th.text-right, td.text-right { text-align: right; }
-        
-        .item-code { font-size: 12px; color: #666; margin-top: 3px; }
-        
-        .total-section { margin-top: 20px; text-align: right; padding: 15px 0; border-top: 2px solid #dee2e6; }
-        .total-section div { margin: 5px 0; }
-        .total-section strong { font-size: 18px; color: #1a1a1a; }
-        
-        .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; }
-        .footer p { margin: 4px 0; font-size: 12px; color: #4a4a4a; }
-  
-        .footer1 { text-align: center; margin-top: 10px; padding-top: 20px; border-top: 1px solid #dee2e6; }
-        .footer1 p { margin: 4px 0; font-size: 9px; color: #4a4a4a; }
-      `;
+      .item-code { font-size: 12px; color: #666; margin-top: 3px; }
       
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
+      .total-section { margin-top: 20px; text-align: right; padding: 15px 0; border-top: 2px solid #dee2e6; }
+      .total-section div { margin: 5px 0; }
+      .total-section strong { font-size: 18px; color: #1a1a1a; }
+      
+      .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; }
+      .footer p { margin: 4px 0; font-size: 12px; color: #4a4a4a; }
+
+      .footer1 { text-align: center; margin-top: 10px; padding-top: 20px; border-top: 1px solid #dee2e6; }
+      .footer1 p { margin: 4px 0; font-size: 9px; color: #4a4a4a; }
+    `;
+    
+    // Set the content of the print window
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
         <head>
           <title>AutoSpa Invoice - ${generatedBill.customer.vehicleNumber}</title>
           <style>${printStyles}</style>
@@ -444,42 +441,51 @@ const Billing = () => {
               <p class="font-semibold mb-1">The pioneer of all kinds of vehicle repairing, maintenance, & car refreshening services</p>
             </div>
             <div class="footer1 text-center text-xs text-muted-foreground pt-2 border-t">
-              <p class="mb-1">Powered by Konnetor Digital Solutions | konnetor.com | +94 74 177 0447</p>
+              <p class="mb-1">Powered by Konnetor Digital Solutions | konnetor.com | +94 74 177 0447 </p>
             </div>
           </div>
         </body>
-        </html>
-      `);
+      </html>
+    `);
+    
+    // Finish writing to the document and print it
+    printWindow.document.close();
+    
+    // Wait a moment for content to load before printing
+    setTimeout(() => {
+      printWindow.print();
       
-      // Close the document to finish writing
-      printWindow.document.close();
-      
-      // Wait a moment for content to load then print
-      setTimeout(() => {
-        printWindow.print();
+      // Close the print window after printing (or when print dialog is closed)
+      printWindow.onafterprint = () => {
+        printWindow.close();
         
-        // Set up onafterprint handler
-        printWindow.onafterprint = () => {
-          printWindow.close();
-          toast.success('Invoice sent to printer and saved successfully');
-        };
+        // Show success toast only after print is complete
+        toast.success('Invoice sent to printer and saved successfully');
         
-        // Backup in case onafterprint doesn't fire
-        setTimeout(() => {
-          if (!printWindow.closed) {
-            printWindow.close();
-          }
-        }, 2000);
-      }, 500);
-      
-    } catch (error) {
-      console.error('Error submitting bill:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to submit bill');
-    }
-  };
-  
-
-
+        // Only reset the form if the user explicitly completes the printing process
+        if (confirm('Would you like to create a new bill?')) {
+          // Reset form after successful submission and printing
+          setBillItems([]);
+          setVehicleNumber('');
+          setCustomerName('');
+          setMobileNumber('');
+          setCompanyName('');
+          setTotalDiscount('');
+          setPaymentMethod('cash');
+          setNotes('');
+          setGeneratedBill(null);
+          setIsPrintDialogOpen(false);
+        } else {
+          // Just close the dialog but keep the form data
+          setIsPrintDialogOpen(false);
+        }
+      };
+    }, 500);
+  } catch (error) {
+    console.error('Error submitting bill:', error);
+    toast.error(error instanceof Error ? error.message : 'Failed to submit bill');
+  }
+};
   return (
     <TransitionEffect>
       <div className="min-h-screen bg-background">
@@ -649,17 +655,14 @@ const Billing = () => {
                       </Button>
                     </div>
                     
-                    <Dialog 
-  open={isPrintDialogOpen} 
-  onOpenChange={setIsPrintDialogOpen}
->
-  <DialogContent className="sm:max-w-[500px]">
-    <DialogHeader>
-      <DialogTitle>Invoice Preview</DialogTitle>
-      <DialogDescription>
-        Review the invoice before printing
-      </DialogDescription>
-    </DialogHeader>
+                    <Dialog open={isCustomServiceDialogOpen} onOpenChange={setIsCustomServiceDialogOpen}>
+                      <DialogContent className="sm:max-w-[500px]">
+                        <DialogHeader>
+                          <DialogTitle>Add Custom Service</DialogTitle>
+                          <DialogDescription>
+                            Add a custom service with a specific price that isn't in the predefined list.
+                          </DialogDescription>
+                        </DialogHeader>
                         
                         <div className="grid gap-4 py-4">
                           <div className="space-y-2">
@@ -694,23 +697,18 @@ const Billing = () => {
                             />
                           </div>
                         </div>
+                        
                         <DialogFooter>
-      <Button
-        onClick={handlePrintBill}
-        className="bg-autospa-red hover:bg-autospa-red/90"
-      >
-        <Printer className="mr-2 h-4 w-4" />
-        Print Invoice
-      </Button>
-      <Button
-        variant="outline"
-        onClick={() => setIsPrintDialogOpen(false)}
-      >
-        Close
-      </Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
+                          <Button variant="outline" onClick={() => setIsCustomServiceDialogOpen(false)}>Cancel</Button>
+                          <Button 
+                            className="bg-autospa-red hover:bg-autospa-red/90"
+                            onClick={handleAddCustomService}
+                          >
+                            Add to Bill
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
                     
                     {billItems.length > 0 ? (
                       <div className="rounded-md border overflow-x-auto">
@@ -934,110 +932,112 @@ const Billing = () => {
           </div>
         </main>
         
-        <Dialog open={isPrintDialogOpen} onOpenChange={(open) => {
-            if (!open) {
-              setIsPrintDialogOpen(false);
-              setBillItems([]);
-              setVehicleNumber('');
-              setCustomerName('');
-              setMobileNumber('');
-              setCompanyName('');
-              setTotalDiscount('');
-              setPaymentMethod('cash');
-              setNotes('');
-              setGeneratedBill(null);
-            }
-          }} className="max-w-[500px]">
-          <DialogContent className="sm:max-w-[500px]" onEscapeKeyDown={() => setIsPrintDialogOpen(false)} onInteractOutside={() => setIsPrintDialogOpen(false)}>
-            <DialogHeader>
-              <DialogTitle>Invoice Preview</DialogTitle>
-              <DialogDescription>
-                Review the invoice before printing
-              </DialogDescription>
-            </DialogHeader>
-            {generatedBill && (
-              <div className="space-y-4">
-                <div className="text-center space-y-2">
-                  <img src="/lovable-uploads/9e4813d3-fe57-41e4-a643-bee06a651855.png" alt="AutoSpa Logo" className="h-16 mx-auto" />
-                  <h2 className="text-xl font-bold">AutoSpa Pvt Ltd</h2>
-                  <p className="text-sm text-muted-foreground">Vehicle Spare Parts & Service Center</p>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-muted-foreground">Bill To:</p>
-                    <p className="font-medium">{generatedBill.customer.name || 'Customer'}</p>
-                    <p>{generatedBill.customer.mobile || '-'}</p>
-                    <p>{generatedBill.customer.company || '-'}</p>
-                    <p>Vehicle: <span className="font-medium">{generatedBill.customer.vehicleNumber}</span></p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium">Invoice Details:</p>
-                    <p>Invoice #: INV-{generatedBill.id.substring(0, 8)}</p>
-                    <p>Date: {format(new Date(generatedBill.date), 'dd/MM/yyyy')}</p>
-                    <p>Payment: {paymentMethod === 'cash' ? 'Cash' : paymentMethod === 'card' ? 'Card' : 'UPI'}</p>
-                  </div>
-                </div>
-                
-                <div className="border rounded-lg overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Item</TableHead>
-                        <TableHead className="text-right">Price</TableHead>
-                        <TableHead className="text-right">Qty</TableHead>
-                        <TableHead className="text-right">Disc.</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {generatedBill.items.map((item, index) => (
-                        <TableRow key={index}>
-                          <TableCell>
-                            <div>{item.name}</div>
-                            <div className="text-xs text-muted-foreground">{item.code}</div>
-                          </TableCell>
-                          <TableCell className="text-right">Rs.{item.price.toLocaleString()}</TableCell>
-                          <TableCell className="text-right">{item.quantity}</TableCell>
-                          <TableCell className="text-right">{item.discount}%</TableCell>
-                          <TableCell className="text-right">Rs.{item.total.toLocaleString()}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-                
-                <div className="text-right space-y-1">
-                  <p>Subtotal: Rs.{generatedBill.subTotal.toLocaleString()}</p>
-                  {generatedBill.discount > 0 && (
-                    <p>Discount ({generatedBill.discount}%): -Rs.{(generatedBill.subTotal - generatedBill.total).toLocaleString()}</p>
-                  )}
-                  <p className="font-bold">Total: Rs.{generatedBill.total.toLocaleString()}</p>
-                </div>
-                
-                {generatedBill.notes && (
-                  <div className="text-sm">
-                    <p className="font-medium">Notes:</p>
-                    <p>{generatedBill.notes}</p>
-                  </div>
-                )}
-                
-                <div class="footer text-center text-xs text-muted-foreground pt-2 border-t">
-                  <p className="mb-1">AutoSpa PVT LTD</p>
-                  <p className="mb-1">Kandy Road, Molagoda, Kegalle<br/>(Next to Millangoda Filling Station)</p>
-                  <p className="mb-1">Contact Us:<br/>0715197759 | 0761752556</p>
-                  <p className="font-semibold mb-1">The pioneer of all kinds of vehicle repairing, maintenance, & car refreshening services</p>
-                </div>
-              </div>
-            )}
-            <DialogFooter>
-              <Button onClick={handlePrintBill} className="w-full">
-                <Printer className="mr-2 h-4 w-4" />
-                Print Invoice
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        {/* Dialog component with accessibility fixes */}
+<Dialog 
+  open={isPrintDialogOpen} 
+  onOpenChange={(open) => {
+    // Only handle the closing case here
+    if (!open) {
+      setIsPrintDialogOpen(false);
+      // Don't reset form data when dialog is closed
+    }
+  }}
+>
+  <DialogContent 
+    className="sm:max-w-[500px] max-h-[100vh] overflow-y-auto"
+  >
+    <DialogHeader>
+      <DialogTitle>Invoice Preview</DialogTitle>
+      <DialogDescription>
+        Review the invoice before printing
+      </DialogDescription>
+    </DialogHeader>
+    {generatedBill && (
+      <div className="space-y-4">
+        <div className="text-center space-y-2">
+          <img src="/lovable-uploads/9e4813d3-fe57-41e4-a643-bee06a651855.png" alt="AutoSpa Logo" className="h-16 mx-auto" />
+          <h2 className="text-xl font-bold">AutoSpa Pvt Ltd</h2>
+          <p className="text-sm text-muted-foreground">Vehicle Spare Parts & Service Center</p>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <p className="text-muted-foreground">Bill To:</p>
+            <p className="font-medium">{generatedBill.customer.name || 'Customer'}</p>
+            <p>{generatedBill.customer.mobile || '-'}</p>
+            <p>{generatedBill.customer.company || '-'}</p>
+            <p>Vehicle: <span className="font-medium">{generatedBill.customer.vehicleNumber}</span></p>
+          </div>
+          <div className="text-right">
+            <p className="font-medium">Invoice Details:</p>
+            <p>Invoice #: INV-{generatedBill.id.substring(0, 8)}</p>
+            <p>Date: {format(new Date(generatedBill.date), 'dd/MM/yyyy')}</p>
+            <p>Payment: {paymentMethod === 'cash' ? 'Cash' : paymentMethod === 'card' ? 'Card' : 'UPI'}</p>
+          </div>
+        </div>
+        
+        <div className="border rounded-lg overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Item</TableHead>
+                <TableHead className="text-right">Price</TableHead>
+                <TableHead className="text-right">Qty</TableHead>
+                <TableHead className="text-right">Disc.</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {generatedBill.items.map((item, index) => (
+                <TableRow key={index}>
+                  <TableCell>
+                    <div>{item.name}</div>
+                    <div className="text-xs text-muted-foreground">{item.code}</div>
+                  </TableCell>
+                  <TableCell className="text-right">Rs.{item.price.toLocaleString()}</TableCell>
+                  <TableCell className="text-right">{item.quantity}</TableCell>
+                  <TableCell className="text-right">{item.discount}%</TableCell>
+                  <TableCell className="text-right">Rs.{item.total.toLocaleString()}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+        
+        <div className="text-right space-y-1">
+          <p>Subtotal: Rs.{generatedBill.subTotal.toLocaleString()}</p>
+          {generatedBill.discount > 0 && (
+            <p>Discount ({generatedBill.discount}%): -Rs.{(generatedBill.subTotal - generatedBill.total).toLocaleString()}</p>
+          )}
+          <p className="font-bold">Total: Rs.{generatedBill.total.toLocaleString()}</p>
+        </div>
+        
+        {generatedBill.notes && (
+          <div className="text-sm">
+            <p className="font-medium">Notes:</p>
+            <p>{generatedBill.notes}</p>
+          </div>
+        )}
+        
+        <div className="footer text-center text-xs text-muted-foreground pt-2 border-t">
+          <p className="mb-1">AutoSpa PVT LTD</p>
+          <p className="mb-1">Kandy Road, Molagoda, Kegalle<br/>(Next to Millangoda Filling Station)</p>
+          <p className="mb-1">Contact Us:<br/>0715197759 | 0761752556</p>
+          <p className="font-semibold mb-1">The pioneer of all kinds of vehicle repairing, maintenance, & car refreshening services</p>
+        </div>
+      </div>
+    )}
+    <DialogFooter className="flex justify-between">
+      <Button variant="outline" onClick={() => setIsPrintDialogOpen(false)}>
+        Back to Edit
+      </Button>
+      <Button onClick={handlePrintBill}>
+        <Printer className="mr-2 h-4 w-4" />
+        Print Invoice
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
       </div>
     </TransitionEffect>
   );
