@@ -30,16 +30,20 @@ pipeline {
             steps {
                 sh '''
                 ssh -o StrictHostKeyChecking=no root@172.245.95.218 '
-                cd /var/www/pos-system || git clone https://github.com/konnetor/pos-system.git /var/www/pos-system;
-                cd /var/www/pos-system;
-                git pull;
-                fuser -k 8000/tcp || true;
-                fuser -k 3000/tcp || true;
+                # Remove existing repo and clone fresh each time
+                rm -rf /var/www/pos-system
+                git clone https://github.com/konnetor/pos-system.git /var/www/pos-system
 
-                cd backend
+                # Kill existing processes
+                fuser -k 8000/tcp || true
+                fuser -k 3000/tcp || true
+
+                # Start backend
+                cd /var/www/pos-system/backend
                 pip3 install --user -r requirements.txt
                 nohup python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload > ../backend.log 2>&1 &
 
+                # Start frontend
                 cd ../frontend
                 npm install
                 nohup npx vite --host --port 3000 > ../frontend.log 2>&1 &
@@ -47,6 +51,5 @@ pipeline {
                 '''
             }
         }
-
     }
 }
