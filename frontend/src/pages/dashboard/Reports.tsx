@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import axios from 'axios';
+import { BACKEND_URL, getApiUrl } from '@/config/api';
 
 interface DailyReportData {
   totalSales: number;
@@ -69,7 +70,7 @@ const Reports = () => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await axios.get<DailyReportData>('http://localhost:8000/api/get_daily_report');
+      const response = await axios.get<DailyReportData>(getApiUrl('/get_daily_report'));
       setDailyReport(response.data);
     } catch (err) {
       console.error('Error fetching daily report:', err);
@@ -242,7 +243,13 @@ const Reports = () => {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <PieChart data={salesBreakdownData} />
+                      <PieChart 
+                        data={salesBreakdownData}
+                        index="name"
+                        category="value"
+                        colors={['#3B82F6', '#8B5CF6']}
+                        valueFormatter={(value) => `Rs.${value.toLocaleString()}`}
+                      />
                     </CardContent>
                   </Card>
                 </div>

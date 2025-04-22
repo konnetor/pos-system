@@ -12,6 +12,7 @@ import { mockBills } from '@/lib/data';
 import { Customer, Bill } from '@/lib/types';
 import { format } from 'date-fns';
 import axios from 'axios';
+import { BACKEND_URL, getApiUrl } from '@/config/api';
 
 interface RawCustomerData {
   id: number;
@@ -55,7 +56,7 @@ const Customers = () => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await axios.get<RawCustomerData[]>('http://localhost:8000/api/get_customers');
+      const response = await axios.get<RawCustomerData[]>(getApiUrl('/get_customers'));
       const customersData = response.data.map((customer: RawCustomerData) => ({
         id: customer.id.toString(),
         name: customer.name || 'Unknown',
