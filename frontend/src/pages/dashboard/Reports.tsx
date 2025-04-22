@@ -70,7 +70,7 @@ const Reports = () => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await axios.get<DailyReportData>(getApiUrl('/get_daily_report'));
+      const response = await axios.get<DailyReportData>(getApiUrl('/api/get_daily_report'));
       setDailyReport(response.data);
     } catch (err) {
       console.error('Error fetching daily report:', err);

@@ -56,7 +56,7 @@ const Customers = () => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await axios.get<RawCustomerData[]>(getApiUrl('/get_customers'));
+      const response = await axios.get<RawCustomerData[]>(getApiUrl('/api/get_customers'));
       const customersData = response.data.map((customer: RawCustomerData) => ({
         id: customer.id.toString(),
         name: customer.name || 'Unknown',
