@@ -534,3 +534,87 @@ async def get_daily_report():
     except Exception as e:
         app_logger.error(f"Error fetching daily report: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/get_report")
+async def get_report(report_type: str = "daily", start_date: str | None = None, end_date: str | None = None):
+    try:
+        today = datetime.utcnow().date()
+        tomorrow = today + timedelta(days=1)
+        
+        # Calculate date range based on report type or custom range
+        if start_date and end_date:
+            # Custom date range
+            start = datetime.strptime(start_date, "%Y-%m-%d").date()
+            end = (datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)).date()
+        else:
+            if report_type == "daily":
+                start = today
+                end = tomorrow  # Include all of today's data
+            elif report_type == "weekly":
+                # Get start of week (Monday) to today
+                start = today - timedelta(days=today.weekday())
+                end = tomorrow  # Include all of today's data
+            elif report_type == "monthly":
+                # Get start of month to today
+                start = today.replace(day=1)
+                end = tomorrow  # Include all of today's data
+            else:
+                raise HTTPException(status_code=400, detail="Invalid report type")
+
+        # Fetch billing data for the date range
+        response = supabase.table('billing')\
+            .select("*")\
+            .gte('payment_date', start.isoformat())\
+            .lt('payment_date', end.isoformat())\
+            .execute()
+
+        if not response.data:
+            return {
+                "totalSales": 0,
+                "totalBills": 0,
+                "bills": [],
+                "dateRange": {
+                    "start": start.isoformat(),
+                    "end": today.isoformat(),  # Show actual end date (today) in response
+                    "type": report_type
+                }
+            }
+
+        # Calculate totals
+        total_sales = sum(bill.get('total', 0) for bill in response.data)
+        
+        # Get detailed bill information
+        bills_with_details = []
+        for bill in response.data:
+            # Calculate product and service sales for this bill
+            items = bill.get('items', [])
+            product_sales = sum(item.get('total', 0) for item in items if item.get('type') == 'product')
+            service_sales = sum(item.get('total', 0) for item in items if item.get('type') == 'service')
+            
+            bills_with_details.append({
+                "id": bill.get('id'),
+                "customer_id": bill.get('customer_id'),
+                "vehicle_no": bill.get('vehicle_no'),
+                "payment_method": bill.get('payment_method'),
+                "sub_total": bill.get('sub_total'),
+                "total": bill.get('total'),
+                "payment_date": bill.get('payment_date'),
+                "product_sales": product_sales,
+                "service_sales": service_sales,
+                "items": items
+            })
+
+        return {
+            "totalSales": total_sales,
+            "totalBills": len(response.data),
+            "bills": bills_with_details,
+            "dateRange": {
+                "start": start.isoformat(),
+                "end": today.isoformat(),  # Show actual end date (today) in response
+                "type": report_type
+            }
+        }
+            
+    except Exception as e:
+        app_logger.error(f"Error fetching report: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

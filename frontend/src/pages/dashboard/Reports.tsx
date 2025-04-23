@@ -42,6 +42,11 @@ interface DailyReportData {
       total: number;
     }>;
   }>;
+  dateRange?: {
+    start: string;
+    end: string;
+    type: string;
+  };
 }
 
 const Reports = () => {
@@ -51,6 +56,10 @@ const Reports = () => {
   const [error, setError] = useState<string | null>(null);
   const [dailyReport, setDailyReport] = useState<DailyReportData | null>(null);
   const [activeTab, setActiveTab] = useState('summary');
+  const [reportType, setReportType] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  const [isCustomRange, setIsCustomRange] = useState(false);
   
   useEffect(() => {
     const isLoggedIn = localStorage.getItem('autospa_isLoggedIn') === 'true';
@@ -62,21 +71,67 @@ const Reports = () => {
       navigate('/dashboard');
     } else {
       setIsAdmin(true);
-      fetchDailyReport();
+      // Initial fetch with daily report type
+      fetchReportWithType('daily');
     }
   }, [navigate]);
 
-  const fetchDailyReport = async () => {
+  // Function to directly fetch with a specific type
+  const fetchReportWithType = async (type: 'daily' | 'weekly' | 'monthly') => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await axios.get<DailyReportData>(getApiUrl('/api/get_daily_report'));
+
+      const url = getApiUrl('/api/get_report');
+      const params = new URLSearchParams();
+      
+      // Use the type parameter directly instead of state
+      params.append('report_type', type);
+      
+      console.log(`Fetching report with type: ${type}`);
+      const response = await axios.get<DailyReportData>(`${url}?${params.toString()}`);
+      
+      // Update report type and data after successful fetch
+      setReportType(type);
       setDailyReport(response.data);
+      setIsCustomRange(false);
+      setStartDate(undefined);
+      setEndDate(undefined);
     } catch (err) {
-      console.error('Error fetching daily report:', err);
+      console.error('Error fetching report:', err);
       setError('Failed to load report data');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Function for custom date range
+  const fetchReportWithDateRange = async (start: Date, end: Date) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const url = getApiUrl('/api/get_report');
+      const params = new URLSearchParams();
+      
+      params.append('start_date', format(start, 'yyyy-MM-dd'));
+      params.append('end_date', format(end, 'yyyy-MM-dd'));
+      
+      console.log(`Fetching report with date range: ${format(start, 'yyyy-MM-dd')} to ${format(end, 'yyyy-MM-dd')}`);
+      const response = await axios.get<DailyReportData>(`${url}?${params.toString()}`);
+      
+      setDailyReport(response.data);
+    } catch (err) {
+      console.error('Error fetching report:', err);
+      setError('Failed to load report data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDateRangeSubmit = () => {
+    if (startDate && endDate) {
+      fetchReportWithDateRange(startDate, endDate);
     }
   };
   
@@ -90,7 +145,7 @@ const Reports = () => {
   const handleExport = () => {
     toast.success('Report exported successfully');
   };
-
+  
   if (isLoading) {
     return (
       <TransitionEffect>
@@ -125,7 +180,7 @@ const Reports = () => {
   const totalBills = dailyReport?.totalBills || 0;
   const totalProductSales = dailyReport?.bills.reduce((sum, bill) => sum + bill.product_sales, 0) || 0;
   const totalServiceSales = dailyReport?.bills.reduce((sum, bill) => sum + bill.service_sales, 0) || 0;
-
+  
   const salesBreakdownData = [
     { name: 'Products', value: totalProductSales },
     { name: 'Services', value: totalServiceSales }
@@ -144,17 +199,101 @@ const Reports = () => {
           <div className="max-w-7xl mx-auto space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <h1 className="text-3xl font-bold tracking-tight">Daily Report</h1>
+                <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
                 <p className="text-muted-foreground">
-                  Today's sales and performance metrics
+                  Sales and performance metrics
                 </p>
               </div>
               
-              <Button onClick={handleExport}>
-                <Download className="mr-2 h-4 w-4" />
-                Export
-              </Button>
+              <div className="flex items-center space-x-2">
+                <select
+                  className="px-3 py-2 rounded-md border"
+                  value={isCustomRange ? 'custom' : reportType}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    console.log('Select value changed to:', value);
+                    if (value === 'custom') {
+                      setIsCustomRange(true);
+                    } else {
+                      // Call the direct fetch function with the selected type
+                      fetchReportWithType(value as 'daily' | 'weekly' | 'monthly');
+                    }
+                  }}
+                >
+                  <option value="daily">Daily Report</option>
+                  <option value="weekly">Weekly Report</option>
+                  <option value="monthly">Monthly Report</option>
+                  <option value="custom">Custom Range</option>
+                </select>
+
+                {isCustomRange && (
+                  <>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="justify-start text-left font-normal"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                          {startDate ? format(startDate, 'dd MMM, yyyy') : 'Start date'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={startDate}
+                        onSelect={setStartDate}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="justify-start text-left font-normal"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                          {endDate ? format(endDate, 'dd MMM, yyyy') : 'End date'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={endDate}
+                        onSelect={setEndDate}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+
+                    <Button 
+                      onClick={handleDateRangeSubmit}
+                      disabled={!startDate || !endDate}
+                    >
+                      Apply Range
+                    </Button>
+                  </>
+                )}
+                
+                <Button onClick={handleExport}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Export
+                </Button>
+              </div>
             </div>
+
+            {/* Date range display */}
+            {dailyReport?.dateRange && (
+              <div className="text-sm text-muted-foreground">
+                Showing data for: {format(new Date(dailyReport.dateRange.start), 'dd MMM, yyyy')}
+                {' - '}
+                {format(new Date(dailyReport.dateRange.end), 'dd MMM, yyyy')}
+                {' '}
+                ({dailyReport.dateRange.type})
+              </div>
+            )}
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <Card className="hover:shadow-md transition-shadow duration-300">
@@ -243,7 +382,7 @@ const Reports = () => {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <PieChart 
+                      <PieChart
                         data={salesBreakdownData}
                         index="name"
                         category="value"
@@ -288,7 +427,7 @@ const Reports = () => {
                               <TableCell className="text-right">Rs.{bill.product_sales.toLocaleString()}</TableCell>
                               <TableCell className="text-right">Rs.{bill.service_sales.toLocaleString()}</TableCell>
                               <TableCell className="text-right">Rs.{bill.total.toLocaleString()}</TableCell>
-                            </TableRow>
+                              </TableRow>
                           ))}
                           {(!dailyReport?.bills || dailyReport.bills.length === 0) && (
                             <TableRow>
